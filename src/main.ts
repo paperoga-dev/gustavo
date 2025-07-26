@@ -1,76 +1,75 @@
-import * as fs from "node:fs";
-import { glob } from 'glob';
+import * as exec from "node:child_process";
+import * as https from "./https.js";
 
-import { PromptTemplate } from "@langchain/core/prompts";
 import { ChatOllama } from "@langchain/ollama";
-import * as https from "./https";
+import { hideBin } from "yargs/helpers";
+import yargs from "yargs";
+import { doPost } from "./llm.js";
 
-const MODEL = "qwen3:8b";
+try {
+    const argv = await yargs(hideBin(process.argv))
+        .option("folder", {
+            demandOption: true,
+            describe: "The folder path",
+            type: "string"
+        })
+        .option("blog", {
+            demandOption: true,
+            describe: "The blog name to post to",
+            type: "string"
+        })
+        .option("model", {
+            default: "auto",
+            describe: "The LLM model to use",
+            type: "string"
+        })
+        .option("contextSize", {
+            default: 5,
+            describe: "How many posts to use as context",
+            type: "number"
+        })
+        .option("minSize", {
+            default: 300,
+            describe: "Minimum size of the post to keep",
+            type: "number"
+        })
+        .option("dryRun", {
+            default: false,
+            describe: "Do not post on Tumblr",
+            type: "boolean"
+        })
+        .version(false)
+        .fail((msg, err) => {
+            if (msg) {
+                throw new Error(msg);
+            } else {
+                throw err;
+            }
+        })
+        .help()
+        .parse();
 
-interface Content {
-    type: string;
-    text: string;
-}
+    const tumblrHandler = new https.Handler();
+    await tumblrHandler.getInfo();
 
-const ollamaLlm = new ChatOllama({
-    model: MODEL,
-    temperature: 1.0
-});
-
-const postHandler = new https.Handler();
-postHandler.getInfo().then(async () => {
-    const files = glob.sync(`papero/**/*.json`);
-    const indexes = Array.from({ length: 5 }, () => Math.floor(Math.random() * files.length));
-    const posts: string[] = [];
-
-    for (const index of indexes) {
-        const file = files[index];
-        console.log(`Processing file: ${file}`);
-        const json = JSON.parse(fs.readFileSync(file, 'utf-8'));
-
-        const text: string = (json.content as Content[])
-            .filter(item => item.type === 'text')
-            .map(item => item.text)
-            .filter(item => item.length > 0)
-            .join("\n\n");
-
-        posts.push(text);
+    let model = argv.model;
+    if (model === "auto") {
+        const models = exec.execFileSync("ollama", ["list"], { stdio: "pipe", encoding: "utf-8" }).trim().split("\n")
+            .filter(line => !line.startsWith("NAME"))
+            .map(line => line.split(" ")[0]!);
+        const index = Math.floor(Math.random() * models.length);
+        model = models[index]!;
     }
 
-    const promptTemplate = PromptTemplate.fromTemplate(`
-Sto per mostrarti una serie di post scritti da me.
+    const llm = new ChatOllama({
+        model,
+        temperature: 1.0
+    });
 
-Il tuo compito è:
-1. Leggere attentamente i miei testi.
-2. Cogliere il mio stile, il mio modo di osservare il mondo, il tono, il ritmo e il vocabolario che uso.
-3. Poi, scrivere un nuovo post, completamente originale, che sembri scritto da me.
+    process.stdout.write(`Using model: ${model}\n\n`);
 
-Il nuovo post deve:
-- essere coerente con il mio stile personale,
-- trattare un tema che potrebbe emergere dai miei scritti (non serve che sia lo stesso),
-- avere un tono umano, autentico e riflessivo,
-- evitare frasi artificiali, didascaliche o troppo spiegate,
-- risultare naturale, come se fosse nato da uno stato d'animo o da un'esperienza vissuta.
-
----
-
-### Ecco i miei post:
-
-{context}
-
----
-
-Ora scrivi un nuovo post, come se fossi io.
-    `);
-
-    const prompt = await promptTemplate.format({
-        context: posts.join("\n---\n")
-    })
-    console.log(prompt);
-
-    const response = await ollamaLlm.invoke(prompt);
-    const content = response.content as string;
-    console.log(`Generated post:\n${content}`);
-    await postHandler.post(content.slice(content.indexOf("</think>") + 8).trim());
-});
-
+    await doPost(argv.folder, argv.blog, llm, argv.contextSize, argv.minSize, argv.dryRun === true ? undefined : tumblrHandler);
+    process.stdout.write("Done!\n");
+} catch (err) {
+    process.stderr.write(`Error: ${(err as Error).message}\n`);
+}

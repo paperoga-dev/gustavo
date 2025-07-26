@@ -1,6 +1,5 @@
 import * as fs from "node:fs";
 import * as https from "node:https";
-import * as path from "node:path";
 import * as querystring from "node:querystring";
 import * as timers from "node:timers";
 
@@ -30,32 +29,16 @@ export class Handler {
         )
     }
 
-    public async post(content: string): Promise<void> {
-        const body = {
-            content: [] as unknown[]
-        };
-
-        content.split("\n").forEach((line) => {
-            const trimmedLine = line.trim();
-            if (trimmedLine.length === 0) {
-                return;
-            }
-
-            body.content.push({
-                type: "text",
-                text: trimmedLine
-            });
-        });
-
+    public async post(blog: string, content: object): Promise<void> {
         return this.doRequest(
             {
                 hostname: "api.tumblr.com",
                 method: "POST",
                 port: 443,
-                path: "/v2/blog/gustavo-9000/posts",
+                path: `/v2/blog/blog/posts`,
             },
             Handler.MAX_RETRIES,
-            body
+            content
         );
     }
 
@@ -97,7 +80,7 @@ export class Handler {
                 headers: {
                     "Content-Length": Buffer.byteLength(tokenData),
                     "Content-Type": "application/x-www-form-urlencoded",
-                    "User-Agent": `TumblrSync/1.0.0`
+                    "User-Agent": `Gustavo/1.0.0`
                 },
                 hostname: "api.tumblr.com",
                 method: "POST",
@@ -175,10 +158,10 @@ export class Handler {
                     Authorization: `Bearer ${token.access_token}`,
                     "Content-Length": Buffer.byteLength(jsonBody),
                     "Content-Type": "application/json",
-                    "User-Agent": `TumblrSync/1.0.0`
+                    "User-Agent": `Gustavo/1.0.0`
                 } : {
                     Authorization: `Bearer ${token.access_token}`,
-                    "User-Agent": `TumblrSync/1.0.0`
+                    "User-Agent": `Gustavo/1.0.0`
                 },
                 ...options
             }, (res) => {

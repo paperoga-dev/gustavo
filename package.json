@@ -4,8 +4,8 @@
   "description": "",
   "license": "ISC",
   "author": "",
-  "type": "commonjs",
-  "main": "dist/main.js",
+  "type": "module",
+  "main": "./dist/main.js",
   "scripts": {
     "build": "tsc -p .",
     "start": "node --env-file=.env dist/main.js",
@@ -14,10 +14,12 @@
   "dependencies": {
     "@langchain/core": "^0.3.66",
     "@langchain/ollama": "^0.2.3",
-    "glob": "^11.0.3"
+    "glob": "^11.0.3",
+    "yargs": "^18.0.0"
   },
   "devDependencies": {
     "@types/node": "^24.1.0",
+    "@types/yargs": "^17.0.33",
     "typescript": "^5.8.3"
   }
 }
