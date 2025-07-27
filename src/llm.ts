@@ -1,45 +1,59 @@
-import * as fs from "node:fs";
-import { glob } from 'glob';
+import * as https from "./https.js";
+import * as tumblr from "./tumblr.js";
 
 import { PromptTemplate } from "@langchain/core/prompts";
 import { ChatOllama } from "@langchain/ollama";
-import * as https from "./https.js";
 
-interface Content {
-    type: string;
-    text: string;
-}
-
-export async function doPost(folder: string, blog: string, model: ChatOllama, contextSize: number, minSize: number, tumblrHandler?: https.Handler): Promise<void> {
-    if (!fs.existsSync(folder)) {
-        throw new Error(`Blog directory does not exist: ${folder}`);
+export async function doPost(
+    source: string,
+    target: string,
+    skipAsks: boolean,
+    skipTags: string[],
+    postsCount: number,
+    model: string,
+    contextSize: number,
+    minSize: number,
+    mood: string,
+    tumblrHandler: https.Handler,
+    dryRun: boolean
+): Promise<void> {
+    const pages = Array.from({ length: postsCount / 20 }, (_, i) => i * 20);
+    for (let i = 0; i < pages.length * 100; i++) {
+        const a = Math.floor(Math.random() * pages.length);
+        const b = Math.floor(Math.random() * pages.length);
+        [pages[a], pages[b]] = [pages[b]!, pages[a]!];
     }
 
-    if (!fs.lstatSync(folder).isDirectory()) {
-        throw new Error(`Path is not a directory: ${folder}`);
-    }
-
-    const files = glob.sync(`${folder}/**/*.json`);
-
-    if (files.length === 0) {
-        throw new Error(`No JSON files found in the directory: ${folder}`);
-    }
-
+    const pagesContent: tumblr.Post[][] = [];
     const posts: string[] = [];
-    while (posts.length < contextSize && files.length > 0) {
-        const index = Math.floor(Math.random() * files.length);
-        const [ file ] = files.splice(index, 1);
 
-        const json = JSON.parse(fs.readFileSync(file!, { encoding: "utf-8" })) as {
-            content?: Content[];
-            [key: string]: unknown;
-        };
+    let inPageIndex = 0;
+    while (posts.length < contextSize) {
+        let sourcePosts: tumblr.Post[] = [];
+        if (pages.length > 0) {
+            const page = pages.shift()!;
+            pagesContent.push(((await tumblrHandler.getPosts(source, page)) as tumblr.Response<tumblr.Posts>).response.posts);
+            sourcePosts = pagesContent[pagesContent.length - 1]!;
+        } else if (pagesContent.length > 0){
+            const page = inPageIndex++ % pagesContent.length;
+            sourcePosts = pagesContent[page]!;
+            if (sourcePosts.length === 0) {
+                pagesContent.splice(page, 1);
+            }
+        } else {
+            throw new Error(`Not enough posts found for source blog: ${source}`);
+        }
 
-        if (json.content === undefined || json.content.length === 0) {
+        const json = sourcePosts.splice(Math.floor(Math.random() * sourcePosts.length), 1)[0]!;
+
+        if (json.content === undefined ||
+            json.content.length === 0 ||
+            (skipAsks && json.asking_name !== undefined) ||
+            (skipTags.length > 0 && json.tags.some(tag => skipTags.includes(tag)))) {
             continue;
         }
 
-        const text: string = (json.content as Content[])
+        const text: string = json.content
             .filter(item => item.type === 'text')
             .map(item => item.text)
             .filter(item => item.length > 0)
@@ -50,46 +64,38 @@ export async function doPost(folder: string, blog: string, model: ChatOllama, co
         }
     }
 
-    if (files.length === 0 && posts.length < contextSize) {
-        throw new Error(`Not enough posts found in the directory: ${folder}`);
+    if (posts.length < contextSize) {
+        throw new Error(`Not enough posts found in the blog: ${source}`);
     }
 
     const promptTemplate = PromptTemplate.fromTemplate(
-`Sto per mostrarti una serie di post scritti da me.
+`[ISTRUZIONI]
 
-Il tuo compito è:
-1. Leggere attentamente i miei testi.
-2. Cogliere il mio stile, il mio modo di osservare il mondo, il tono, il ritmo e il vocabolario che uso.
-3. Poi, scrivere un nuovo post, completamente originale, che sembri scritto da me.
+Sei uno scrittore creativo e ${mood}. Leggerai dei post di un blog scritti dalla stessa persona. Il tuo compito è scrivere un nuovo post originale che sembri scritto dalla stessa mano, con lo stesso stile e modo di ragionare.
 
-Il nuovo post deve:
-- essere contenuto tra i tag <post> e </post>,
-- essere coerente con il mio stile personale,
-- trattare un tema che potrebbe emergere dai miei scritti (non serve che sia lo stesso),
-- avere un tono umano, autentico e riflessivo,
-- evitare frasi artificiali, didascaliche o troppo spiegate,
-- risultare naturale, come se fosse nato da uno stato d'animo o da un'esperienza vissuta,
-- avere comunque un sottotesto ironico e leggero.
+Non riassumere i post, non copiarli, usa come ispirazione il contenuto, lo stile e il tono dei post letti.
 
----
-
-### Ecco i miei post:
+[POST DI RIFERIMENTO]
 
 {context}
 
----
+[NUOVO POST]
 
-Ora scrivi un nuovo post, come se fossi io.
-`);
+Scrivi ora un nuovo post originale ispirato ai contenuti precedenti e racchiuso tra i tag <post> e </post>.`);
 
     const prompt = await promptTemplate.format({
-        context: posts.join("\n---\n")
+        context: posts.map((item, index) => `POST ${index + 1}:\n${item}`).join("\n\n")
     })
-    process.stdout.write(`Prompt:${prompt}\n\n`);
+    process.stdout.write(`Prompt:\n${prompt}\n\n`);
 
     let tries = 5;
     while (tries--) {
-        const response = await model.invoke(prompt);
+        const llm = new ChatOllama({
+            model,
+            temperature: 1.0
+        });
+
+        const response = await llm.invoke(prompt);
         const llmOutput = response.content as string;
         process.stdout.write(`LLM output:\n${llmOutput}\n\n`);
 
@@ -107,15 +113,19 @@ Ora scrivi un nuovo post, come se fossi io.
             .map(line => ({
                 type: "text",
                 text: line
-            }) as Content);
+            }) as tumblr.Content);
 
         const postObj = {
-            content: tumblrPost
+            content: tumblrPost,
+            tags: [`umore: ${mood}`]
         };
 
         process.stdout.write(`Tumblr post:\n${JSON.stringify(postObj, undefined, 2)}\n\n`);
 
-        await tumblrHandler?.post(blog, postObj);
+        if (!dryRun) {
+            await tumblrHandler?.writePost(target, postObj);
+        }
+
         break;
     }
 }

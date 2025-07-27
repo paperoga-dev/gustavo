@@ -2,6 +2,7 @@ import * as fs from "node:fs";
 import * as https from "node:https";
 import * as querystring from "node:querystring";
 import * as timers from "node:timers";
+import * as url from "node:url";
 
 interface Token {
     access_token: string;
@@ -17,19 +18,40 @@ export class Handler {
     private readonly tokenPath = "token.json";
     private token?: Token;
 
-    public async getInfo(): Promise<void> {
+    public async getInfo(blogName: string): Promise<object> {
+        const tumblrUrl = new url.URL(`/v2/blog/${blogName}/info`, "https://api.tumblr.com");
+        tumblrUrl.searchParams.set("api_key", process.env.CLIENT_ID || "");
+
         return this.doRequest(
             {
                 hostname: "api.tumblr.com",
                 method: "GET",
                 port: 443,
-                path: "/v2/user/info"
+                path: tumblrUrl.pathname + tumblrUrl.search
             },
             Handler.MAX_RETRIES
         )
     }
 
-    public async post(blog: string, content: object): Promise<void> {
+    public async getPosts(blogName: string, page: number): Promise<object> {
+        const tumblrUrl = new url.URL(`/v2/blog/${blogName}/posts`, "https://api.tumblr.com");
+        tumblrUrl.searchParams.set("api_key", process.env.CLIENT_ID || "");
+        tumblrUrl.searchParams.set("offset", page.toString());
+        tumblrUrl.searchParams.set("limit", "20");
+        tumblrUrl.searchParams.set("npf", "true");
+
+        return this.doRequest(
+            {
+                hostname: "api.tumblr.com",
+                method: "GET",
+                port: 443,
+                path: tumblrUrl.pathname + tumblrUrl.search
+            },
+            Handler.MAX_RETRIES
+        )
+    }
+
+    public async writePost(blog: string, content: object): Promise<object> {
         return this.doRequest(
             {
                 hostname: "api.tumblr.com",
@@ -136,7 +158,7 @@ export class Handler {
 
     private async doRequest(
         options: https.RequestOptions, failures: number, body?: object
-    ): Promise<void> {
+    ): Promise<object> {
         if (failures === 0) {
             throw new Error("Request failed");
         }
@@ -145,7 +167,7 @@ export class Handler {
 
         const token = await this.getToken();
 
-        return new Promise<void>((resolve) => {
+        return new Promise<object>((resolve) => {
             const retry = (msg: string): void => {
                 console.error(`\t${msg}, retrying in 5 seconds ...`);
                 timers.setTimeout(() => {
@@ -165,26 +187,19 @@ export class Handler {
                 },
                 ...options
             }, (res) => {
+                let resData = "";
+
                 switch (res.statusCode) {
                     case 200:
-                        res.setEncoding("utf8");
-                        res.on("data", () => { });
-                        res.on("end", () => {
-                            if (body) {
-                                timers.setTimeout(() => {
-                                    resolve(this.doRequest(options, failures - 1, body));
-                                }, 10000);
-                            } else {
-                                resolve();
-                            }
-                        });
-                        break;
-
                     case 201:
                         res.setEncoding("utf8");
-                        res.on("data", () => { });
+
+                        res.on("data", (data) => {
+                            resData += data;
+                        });
+
                         res.on("end", () => {
-                            resolve();
+                            resolve(JSON.parse(resData));
                         });
                         break;
 

@@ -1,19 +1,20 @@
 import * as exec from "node:child_process";
+import * as input from "./input.js";
 import * as https from "./https.js";
+import * as tumblr from "./tumblr.js";
 
-import { ChatOllama } from "@langchain/ollama";
 import { hideBin } from "yargs/helpers";
 import yargs from "yargs";
 import { doPost } from "./llm.js";
 
 try {
     const argv = await yargs(hideBin(process.argv))
-        .option("folder", {
+        .option("source", {
             demandOption: true,
-            describe: "The folder path",
+            describe: "The blog name to post to",
             type: "string"
         })
-        .option("blog", {
+        .option("target", {
             demandOption: true,
             describe: "The blog name to post to",
             type: "string"
@@ -33,6 +34,21 @@ try {
             describe: "Minimum size of the post to keep",
             type: "number"
         })
+        .option("mood", {
+            describe: "Post mood",
+            type: "string"
+        })
+        .option("skipTags", {
+            default: [],
+            describe: "Skip tags in the posts",
+            type: "array",
+            coerce: (v): string[] => v.map(String)
+        })
+        .option("skipAsks", {
+            default: false,
+            describe: "Skip posts that are asks",
+            type: "boolean"
+        })
         .option("dryRun", {
             default: false,
             describe: "Do not post on Tumblr",
@@ -50,7 +66,7 @@ try {
         .parse();
 
     const tumblrHandler = new https.Handler();
-    await tumblrHandler.getInfo();
+    const postsCount = ((await tumblrHandler.getInfo(argv.source)) as tumblr.Response<tumblr.BlogObject>).response.blog.posts;
 
     let model = argv.model;
     if (model === "auto") {
@@ -61,14 +77,12 @@ try {
         model = models[index]!;
     }
 
-    const llm = new ChatOllama({
-        model,
-        temperature: 1.0
-    });
-
     process.stdout.write(`Using model: ${model}\n\n`);
 
-    await doPost(argv.folder, argv.blog, llm, argv.contextSize, argv.minSize, argv.dryRun === true ? undefined : tumblrHandler);
+    await doPost(argv.source, argv.target, argv.skipAsks, argv.skipTags, postsCount,
+        model, argv.contextSize, argv.minSize,
+        argv.mood ?? input.moodValues[Math.floor(Math.random() * input.moodValues.length)]!.toLocaleLowerCase(),
+        tumblrHandler, argv.dryRun === true);
     process.stdout.write("Done!\n");
 } catch (err) {
     process.stderr.write(`Error: ${(err as Error).message}\n`);
