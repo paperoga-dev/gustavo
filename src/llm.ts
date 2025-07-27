@@ -54,8 +54,8 @@ export async function doPost(folder: string, blog: string, model: ChatOllama, co
         throw new Error(`Not enough posts found in the directory: ${folder}`);
     }
 
-    const promptTemplate = PromptTemplate.fromTemplate(`
-Sto per mostrarti una serie di post scritti da me.
+    const promptTemplate = PromptTemplate.fromTemplate(
+`Sto per mostrarti una serie di post scritti da me.
 
 Il tuo compito è:
 1. Leggere attentamente i miei testi.
@@ -63,6 +63,7 @@ Il tuo compito è:
 3. Poi, scrivere un nuovo post, completamente originale, che sembri scritto da me.
 
 Il nuovo post deve:
+- essere contenuto tra i tag <post> e </post>,
 - essere coerente con il mio stile personale,
 - trattare un tema che potrebbe emergere dai miei scritti (non serve che sia lo stesso),
 - avere un tono umano, autentico e riflessivo,
@@ -79,29 +80,42 @@ Il nuovo post deve:
 ---
 
 Ora scrivi un nuovo post, come se fossi io.
-    `);
+`);
 
     const prompt = await promptTemplate.format({
         context: posts.join("\n---\n")
     })
     process.stdout.write(`Prompt:${prompt}\n\n`);
 
-    const response = await model.invoke(prompt);
-    const generatedPost = response.content as string;
-    process.stdout.write(`Generated post:\n${generatedPost}\n\n`);
+    let tries = 5;
+    while (tries--) {
+        const response = await model.invoke(prompt);
+        const llmOutput = response.content as string;
+        process.stdout.write(`LLM output:\n${llmOutput}\n\n`);
 
-    const tumblrPost = generatedPost
-        .replace(/<think>[\s\S]*?<\/think>/g, "")
-        .trim()
-        .split("\n")
-        .map(line => line.trim())
-        .filter(line => line.length > 0)
-        .map(line => ({
-            type: "text",
-            text: line
-        }) as Content);
+        const llmPost = llmOutput.match(/<post>(.*?)<\/post>/s);
 
-    process.stdout.write(`Tumblr post:\n${JSON.stringify(tumblrPost, undefined, 2)}\n\n`);
+        if (!llmPost) {
+            continue;
+        }
 
-    await tumblrHandler?.post(blog, tumblrPost);
+        const tumblrPost = llmPost[1]!
+            .trim()
+            .split("\n")
+            .map(line => line.trim())
+            .filter(line => line.length > 0)
+            .map(line => ({
+                type: "text",
+                text: line
+            }) as Content);
+
+        const postObj = {
+            content: tumblrPost
+        };
+
+        process.stdout.write(`Tumblr post:\n${JSON.stringify(postObj, undefined, 2)}\n\n`);
+
+        await tumblrHandler?.post(blog, postObj);
+        break;
+    }
 }

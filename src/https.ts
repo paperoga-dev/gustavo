@@ -35,7 +35,7 @@ export class Handler {
                 hostname: "api.tumblr.com",
                 method: "POST",
                 port: 443,
-                path: `/v2/blog/blog/posts`,
+                path: `/v2/blog/${blog}/posts`,
             },
             Handler.MAX_RETRIES,
             content
