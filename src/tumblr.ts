@@ -15,10 +15,14 @@ export interface BlogObject {
 export interface Content {
     type: string;
     text: string;
+    formatting?: [{
+        [key: string]: unknown;
+    }];
 }
 
 export interface Post {
     [key: string]: unknown;
+    post_url: string;
     id_string: string;
     timestamp: number;
     asking_name?: string;

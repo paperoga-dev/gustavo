@@ -25,10 +25,11 @@ export async function doPost(
     }
 
     const pagesContent: tumblr.Post[][] = [];
-    const posts: string[] = [];
+    const posts: Map<string, string> = new Map();
+    const links: Map<string, string> = new Map();
 
     let inPageIndex = 0;
-    while (posts.length < contextSize) {
+    while (posts.size < contextSize) {
         let sourcePosts: tumblr.Post[] = [];
         if (pages.length > 0) {
             const page = pages.shift()!;
@@ -60,11 +61,12 @@ export async function doPost(
             .join("\n\n");
 
         if (text.length > minSize) {
-            posts.push(text);
+            posts.set(json.id_string, text);
+            links.set(json.id_string, json.post_url);
         }
     }
 
-    if (posts.length < contextSize) {
+    if (posts.size < contextSize) {
         throw new Error(`Not enough posts found in the blog: ${source}`);
     }
 
@@ -81,21 +83,25 @@ Non riassumere i post, non copiarli, usa come ispirazione il contenuto, lo stile
 
 [NUOVO POST]
 
-Scrivi ora un nuovo post originale ispirato ai contenuti precedenti e racchiuso tra i tag <post> e </post>.`);
+Scrivi ora un nuovo post originale ispirato ai contenuti precedenti e racchiuso tra i tag <post> e </post>.`
+    );
 
     const prompt = await promptTemplate.format({
-        context: posts.map((item, index) => `POST ${index + 1}:\n${item}`).join("\n\n")
+        context: Array.from(posts.values()).map((item, index) => `POST ${index + 1}:\n${item}`).join("\n\n")
     })
     process.stdout.write(`Prompt:\n${prompt}\n\n`);
 
     let tries = 5;
     while (tries--) {
+        const temperature = Math.random() * 2.0;
         const llm = new ChatOllama({
             model,
-            temperature: 1.0
+            temperature
         });
 
+        const start = Date.now();
         const response = await llm.invoke(prompt);
+        const elapsed = Date.now() - start;
         const llmOutput = response.content as string;
         process.stdout.write(`LLM output:\n${llmOutput}\n\n`);
 
@@ -115,9 +121,31 @@ Scrivi ora un nuovo post originale ispirato ai contenuti precedenti e racchiuso 
                 text: line
             }) as tumblr.Content);
 
+        let postIndex = 0;
+        posts.forEach((_, key) => {
+            const linkText = `[${++postIndex}] ${key}`;
+            tumblrPost.push({
+                "type": "text",
+                "text": linkText,
+                "formatting": [
+                    {
+                        "start": linkText.indexOf("]") + 2,
+                        "end": linkText.length + 1,
+                        "type": "link",
+                        "url": links.get(key) || ""
+                    }
+                ]
+            });
+        });
+
         const postObj = {
             content: tumblrPost,
-            tags: [`umore: ${mood}`]
+            tags: [
+                `umore: ${mood}`,
+                `modello: ${model}`,
+                `durata: ${(elapsed / 1000).toFixed(2)}s`,
+                `temperatura: ${temperature.toFixed(2)}`
+            ].join(",")
         };
 
         process.stdout.write(`Tumblr post:\n${JSON.stringify(postObj, undefined, 2)}\n\n`);
