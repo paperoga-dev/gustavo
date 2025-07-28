@@ -1,0 +1,15 @@
+Leggi attentamente i post qui sotto, tratti da un blog personale. Analizza attentamente:
+- il contenuto e gli argomenti
+- lo stile di scrittura dell'autore
+- il tono e la struttura dei post
+
+Successivamente, scrivi un nuovo post originale che:
+- sia coerente con lo stile e il modo di pensare dell’autore
+- sembri scritto dalla stessa persona
+- abbia un tono {mood}
+
+---
+{context}
+---  
+
+Ora scrivi un nuovo post, seguendo fedelmente il tono indicato, lo stile dell'autore e la coerenza tematica. Non spiegare cosa stai facendo, inizia direttamente a scrivere il post e racchiudilo tra i tag <post> e </post>.

@@ -1,3 +1,5 @@
+import * as fs from "node:fs";
+import * as path from "node:path";
 import * as https from "./https.js";
 import * as tumblr from "./tumblr.js";
 
@@ -71,24 +73,13 @@ export async function doPost(
     }
 
     const promptTemplate = PromptTemplate.fromTemplate(
-`[ISTRUZIONI]
-
-Sei uno scrittore creativo e ${mood}. Leggerai dei post di un blog scritti dalla stessa persona. Il tuo compito è scrivere un nuovo post originale che sembri scritto dalla stessa mano, con lo stesso stile e modo di ragionare.
-
-Non riassumere i post, non copiarli, usa come ispirazione il contenuto, lo stile e il tono dei post letti.
-
-[POST DI RIFERIMENTO]
-
-{context}
-
-[NUOVO POST]
-
-Scrivi ora un nuovo post originale ispirato ai contenuti precedenti e racchiuso tra i tag <post> e </post>.`
+        fs.readFileSync(path.join("prompt", model.split(":").at(0)?.split("/").at(-1) ?? ""), { encoding: "utf-8" })
     );
 
     const prompt = await promptTemplate.format({
-        context: Array.from(posts.values()).map((item, index) => `POST ${index + 1}:\n${item}`).join("\n\n")
-    })
+        context: Array.from(posts.values()).map((item, index) => `POST ${index + 1}:\n${item}`).join("\n\n"),
+        mood
+    });
     process.stdout.write(`Prompt:\n${prompt}\n\n`);
 
     let tries = 5;
