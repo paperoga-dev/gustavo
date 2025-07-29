@@ -121,7 +121,7 @@ export async function doPost(
                 "formatting": [
                     {
                         "start": linkText.indexOf("]") + 2,
-                        "end": linkText.length + 1,
+                        "end": linkText.length,
                         "type": "link",
                         "url": links.get(key) || ""
                     }
