@@ -102,7 +102,7 @@ export class Handler {
                 headers: {
                     "Content-Length": Buffer.byteLength(tokenData),
                     "Content-Type": "application/x-www-form-urlencoded",
-                    "User-Agent": `Gustavo/1.0.0`
+                    "User-Agent": `TumblrAI/1.0.0`
                 },
                 hostname: "api.tumblr.com",
                 method: "POST",
@@ -180,10 +180,10 @@ export class Handler {
                     Authorization: `Bearer ${token.access_token}`,
                     "Content-Length": Buffer.byteLength(jsonBody),
                     "Content-Type": "application/json",
-                    "User-Agent": `Gustavo/1.0.0`
+                    "User-Agent": `TumblrAI/1.0.0`
                 } : {
                     Authorization: `Bearer ${token.access_token}`,
-                    "User-Agent": `Gustavo/1.0.0`
+                    "User-Agent": `TumblrAI/1.0.0`
                 },
                 ...options
             }, (res) => {

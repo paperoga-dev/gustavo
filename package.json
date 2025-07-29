@@ -1,15 +1,21 @@
 {
-  "name": "gustavo",
+  "name": "tumblr-ai",
   "version": "1.0.0",
-  "description": "",
-  "license": "ISC",
-  "author": "",
+  "description": "Tumblr AI",
+  "license": "MIT",
+  "author": {
+      "name": "Paperoga",
+      "email": "paperoga.dev@gmail.com",
+      "url": "https://github.com/paperoga-dev"
+  },
+  "repository": {
+      "type": "git",
+      "url": "https://github.com/paperoga-dev/TumblrAI"
+  },
   "type": "module",
   "main": "./dist/main.js",
   "scripts": {
-    "build": "tsc -p .",
-    "start": "node --env-file=.env dist/main.js",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "build": "tsc -p ."
   },
   "dependencies": {
     "@langchain/core": "^0.3.66",
