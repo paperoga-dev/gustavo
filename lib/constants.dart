@@ -1,4 +1,4 @@
-const List<String> moods = [
+const moods = <String>[
   "Felice",
   "Allegro",
   "Euforico",
@@ -96,16 +96,16 @@ const List<String> moods = [
   "Ispirato",
 ];
 
-const String autoMood = "<Auto>";
-const String uiMaxPosts = "UI_MAX_POSTS";
-const String uiMinLength = "UI_MIN_LENGTH";
-const String uiMaxLength = "UI_MAX_LENGTH";
-const String uiModelTemperature = "UI_MODEL_TEMPERATURE";
-const String uiModelTopP = "UI_MODEL_TOP_P";
-const String uiDryRun = "UI_DRY_RUN";
-const String uiSourceBlog = "UI_SOURCE_BLOG";
-const String uiTargetBlog = "UI_TARGET_BLOG";
-const String uiModel = "UI_MODEL";
-const String uiMood = "UI_MOOD";
-const String uiSkipAsks = "UI_SKIP_ASKS";
-const String uiSkipTags = "UI_SKIP_TAGS";
+const autoMood = "<Auto>";
+const uiMaxPosts = "UI_MAX_POSTS";
+const uiMinLength = "UI_MIN_LENGTH";
+const uiMaxLength = "UI_MAX_LENGTH";
+const uiModelTemperature = "UI_MODEL_TEMPERATURE";
+const uiModelTopP = "UI_MODEL_TOP_P";
+const uiDryRun = "UI_DRY_RUN";
+const uiSourceBlog = "UI_SOURCE_BLOG";
+const uiTargetBlog = "UI_TARGET_BLOG";
+const uiModel = "UI_MODEL";
+const uiMood = "UI_MOOD";
+const uiSkipAsks = "UI_SKIP_ASKS";
+const uiSkipTags = "UI_SKIP_TAGS";

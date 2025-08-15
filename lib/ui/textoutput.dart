@@ -1,4 +1,6 @@
-import 'package:flutter/material.dart';
+import "dart:async";
+
+import "package:flutter/material.dart";
 
 class ExTextOutputController {
   void Function(String text)? _append;
@@ -17,15 +19,19 @@ class ExTextOutput extends StatefulWidget {
   final String labelText;
   final ExTextOutputController controller;
 
-  const ExTextOutput({super.key, required this.labelText, required this.controller});
+  const ExTextOutput({
+    super.key,
+    required this.labelText,
+    required this.controller,
+  });
 
   @override
   State<ExTextOutput> createState() => _ExTextOutputState();
 }
 
 class _ExTextOutputState extends State<ExTextOutput> {
-  final TextEditingController _textController = TextEditingController();
-  final ScrollController _scrollController = ScrollController();
+  final _textController = TextEditingController();
+  final _scrollController = ScrollController();
 
   @override
   void initState() {
@@ -54,39 +60,35 @@ class _ExTextOutputState extends State<ExTextOutput> {
   }
 
   @override
-  Widget build(BuildContext context) {
-    return Expanded(
-      child: TextField(
-        controller: _textController,
-        scrollController: _scrollController,
-        readOnly: true,
-        expands: true,
-        minLines: null,
-        maxLines: null,
-        textAlignVertical: TextAlignVertical.top,
-        keyboardType: TextInputType.multiline,
-        decoration: InputDecoration(
-          border: OutlineInputBorder(),
-          labelText: widget.labelText,
-          alignLabelWithHint: true,
-        ),
-        style: const TextStyle(
-          fontFamily: 'Courier New',
-          fontSize: 12,
-        )
+  Widget build(BuildContext context) => Expanded(
+    child: TextField(
+      controller: _textController,
+      scrollController: _scrollController,
+      readOnly: true,
+      expands: true,
+      maxLines: null,
+      textAlignVertical: TextAlignVertical.top,
+      keyboardType: TextInputType.multiline,
+      decoration: InputDecoration(
+        border: const OutlineInputBorder(),
+        labelText: widget.labelText,
+        alignLabelWithHint: true,
       ),
-    );
-  }
+      style: const TextStyle(fontFamily: "Courier New", fontSize: 12),
+    ),
+  );
 
   void append(String text) {
     _textController.text += text;
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_scrollController.hasClients) {
-        _scrollController.animateTo(
-          _scrollController.position.maxScrollExtent,
-          duration: Duration(milliseconds: 300),
-          curve: Curves.easeOut,
+        unawaited(
+          _scrollController.animateTo(
+            _scrollController.position.maxScrollExtent,
+            duration: const Duration(milliseconds: 300),
+            curve: Curves.easeOut,
+          ),
         );
       }
     });

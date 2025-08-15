@@ -1,5 +1,7 @@
-import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import "dart:async";
+
+import "package:flutter/material.dart";
+import "package:shared_preferences/shared_preferences.dart";
 
 enum ExTextFieldType { text, number }
 
@@ -24,9 +26,9 @@ class ExTextField extends StatefulWidget {
 }
 
 class _ExTextFieldState extends State<ExTextField> {
-  final SharedPreferencesAsync _prefs = SharedPreferencesAsync();
-  final TextEditingController _controller = TextEditingController();
-  final FocusNode _focusNode = FocusNode();
+  final _prefs = SharedPreferencesAsync();
+  final _controller = TextEditingController();
+  final _focusNode = FocusNode();
 
   @override
   void dispose() {
@@ -45,17 +47,16 @@ class _ExTextFieldState extends State<ExTextField> {
       }
     });
 
-    _initController();
+    unawaited(_initController());
   }
 
   Future<void> save() async {
     switch (widget.keyboardType) {
       case TextInputType.number:
         await _prefs.setInt(widget.prefKey, int.parse(_controller.text));
-        break;
+
       default:
         await _prefs.setString(widget.prefKey, _controller.text);
-        break;
     }
   }
 
@@ -64,18 +65,19 @@ class _ExTextFieldState extends State<ExTextField> {
       switch (widget.keyboardType) {
         case TextInputType.number:
           await _prefs.setInt(widget.prefKey, widget.defaultValue);
-          break;
+
         default:
           await _prefs.setString(widget.prefKey, widget.defaultValue);
-          break;
       }
     }
 
-    final String value = widget.keyboardType == TextInputType.number ?
-        (await _prefs.getInt(widget.prefKey))!.toString() :
-        (await _prefs.getString(widget.prefKey))!;
+    final String value = widget.keyboardType == TextInputType.number
+        ? (await _prefs.getInt(widget.prefKey))!.toString()
+        : (await _prefs.getString(widget.prefKey))!;
 
-    if (!mounted) return;
+    if (!mounted) {
+      return;
+    }
 
     setState(() {
       _controller.text = value;
@@ -83,16 +85,14 @@ class _ExTextFieldState extends State<ExTextField> {
   }
 
   @override
-  Widget build(BuildContext context) {
-    return TextField(
-      controller: _controller,
-      focusNode: _focusNode,
-      keyboardType: widget.keyboardType ?? TextInputType.text,
-      obscureText: widget.obscureText ?? false,
-      decoration: InputDecoration(
-        border: OutlineInputBorder(),
-        labelText: widget.labelText,
-      ),
-    );
-  }
+  Widget build(BuildContext context) => TextField(
+    controller: _controller,
+    focusNode: _focusNode,
+    keyboardType: widget.keyboardType ?? TextInputType.text,
+    obscureText: widget.obscureText ?? false,
+    decoration: InputDecoration(
+      border: const OutlineInputBorder(),
+      labelText: widget.labelText,
+    ),
+  );
 }

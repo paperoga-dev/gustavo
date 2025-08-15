@@ -1,38 +1,35 @@
-import 'dart:convert';
-import 'dart:io';
+import "dart:convert";
+import "dart:io";
+import "dart:typed_data";
 
-import 'package:flutter/cupertino.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
-import 'package:http/http.dart' as http;
-import 'package:shared_preferences/shared_preferences.dart';
-import 'package:uuid/uuid.dart';
+import "package:flutter/material.dart";
+import "package:flutter_dotenv/flutter_dotenv.dart";
+import "package:http/http.dart" as http;
+import "package:shared_preferences/shared_preferences.dart";
+import "package:uuid/uuid.dart";
 
 class Client {
   Future<String> Function(Uri authUri) onAuthWebCall;
 
-  final SharedPreferencesAsync _storage = SharedPreferencesAsync();
+  final _storage = SharedPreferencesAsync();
   Map<String, dynamic>? _authToken;
 
-  Client({
-    required this.onAuthWebCall,
-  });
+  Client({required this.onAuthWebCall});
 
   static Uri _makeUri(
     String path, {
     Map<String, dynamic>? queryParameters,
     bool isV2 = true,
-  }) {
-    return Uri(
-      scheme: "https",
-      host: isV2 ? "api.tumblr.com" : "www.tumblr.com",
-      path: isV2 ? "v2$path" : path,
-      queryParameters: queryParameters,
-    );
-  }
+  }) => Uri(
+    scheme: "https",
+    host: isV2 ? "api.tumblr.com" : "www.tumblr.com",
+    path: isV2 ? "v2$path" : path,
+    queryParameters: queryParameters,
+  );
 
   Future<void> _getAccessToken() async {
     if (_authToken != null) {
-      final resp = await http.post(
+      final http.Response resp = await http.post(
         _makeUri("/oauth2/token"),
         headers: {"Content-Type": "application/x-www-form-urlencoded"},
         body: {
@@ -44,7 +41,7 @@ class Client {
       );
 
       if (resp.statusCode == 200) {
-        final body = resp.body;
+        final String body = resp.body;
         _authToken = json.decode(body);
         await _storage.setString("TUMBLR_TOKEN", body);
         return;
@@ -53,7 +50,7 @@ class Client {
         await _storage.remove("TUMBLR_TOKEN");
       }
     } else {
-      final storageToken = await _storage.getString("TUMBLR_TOKEN");
+      final String? storageToken = await _storage.getString("TUMBLR_TOKEN");
       if (storageToken != null) {
         _authToken = json.decode(storageToken);
         return;
@@ -74,7 +71,7 @@ class Client {
         isV2: false,
       ),
     ).then((verifier) async {
-      final resp = await http.post(
+      final http.Response resp = await http.post(
         _makeUri("/oauth2/token"),
         headers: {"Content-Type": "application/x-www-form-urlencoded"},
         body: {
@@ -86,7 +83,7 @@ class Client {
       );
 
       if (resp.statusCode == 200) {
-        final body = resp.body;
+        final String body = resp.body;
         _authToken = json.decode(body);
         await _storage.setString("TUMBLR_TOKEN", body);
       }
@@ -101,17 +98,15 @@ class Client {
 
     if (_authToken == null) {
       return _getAccessToken()
-          .then((_) {
-            return get(path, queryParameters: queryParameters);
-          })
+          .then((_) => get(path, queryParameters: queryParameters))
           .catchError((err) {
             debugPrint("GET, ERROR, $err");
             return <String, dynamic>{};
           });
     }
 
-    debugPrint("GET, url = ${uri.toString()}");
-    final response = await http.get(
+    debugPrint("GET, url = $uri");
+    final http.Response response = await http.get(
       uri,
       headers: {"Authorization": "Bearer ${_authToken?["access_token"]}"},
     );
@@ -121,15 +116,15 @@ class Client {
     switch (response.statusCode) {
       case 200:
         {
-          final body = response.body;
+          final String body = response.body;
           debugPrint("GET, body = $body");
           return json.decode(body)["response"];
         }
 
       case 401:
-        return _getAccessToken().then((_) {
-          return get(path, queryParameters: queryParameters);
-        });
+        return _getAccessToken().then(
+          (_) => get(path, queryParameters: queryParameters),
+        );
 
       default:
         throw HttpException(
@@ -144,20 +139,18 @@ class Client {
 
     if (_authToken == null) {
       return _getAccessToken()
-          .then((_) {
-            return post(path, body: body);
-          })
+          .then((_) => post(path, body: body))
           .catchError((err) {
             debugPrint("POST, ERROR, $err");
             return;
           });
     }
 
-    debugPrint("POST, url = ${uri.toString()}");
+    debugPrint("POST, url = $uri");
     final String jsonBody = json.encode(body);
-    final bodyBytes = utf8.encode(jsonBody);
+    final Uint8List bodyBytes = utf8.encode(jsonBody);
 
-    final response = await http.post(
+    final http.Response response = await http.post(
       uri,
       headers: {
         "Authorization": "Bearer ${_authToken?["access_token"]}",
@@ -173,9 +166,7 @@ class Client {
         return;
 
       case 401:
-        return _getAccessToken().then((_) {
-          return post(path, body: body);
-        });
+        return _getAccessToken().then((_) => post(path, body: body));
 
       default:
         throw HttpException(

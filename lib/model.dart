@@ -1,8 +1,7 @@
-import 'package:flutter/material.dart';
-import 'package:main/ui/listview.dart';
-import 'package:main/ui/textfield.dart';
-
-import 'constants.dart';
+import "package:flutter/material.dart";
+import "package:main/constants.dart";
+import "package:main/ui/listview.dart";
+import "package:main/ui/textfield.dart";
 
 class ModelWidget extends StatefulWidget {
   final List<String> models;
@@ -15,57 +14,54 @@ class ModelWidget extends StatefulWidget {
 
 class _ModelWidgetState extends State<ModelWidget> {
   @override
-  Widget build(BuildContext context) {
-    return Column(
-      children: [
-        SizedBox(height: 30),
-        Expanded(
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            spacing: 10,
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisAlignment: MainAxisAlignment.start,
-                  spacing: 10,
-                  children: [
-                    Expanded(
-                      child: ExListView(
-                        prefKey: uiModel,
-                        labelText: "Model:",
-                        items: widget.models,
-                        defaultValue: "",
-                      ),
+  Widget build(BuildContext context) => Column(
+    children: [
+      const SizedBox(height: 30),
+      Expanded(
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          spacing: 10,
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                spacing: 10,
+                children: [
+                  Expanded(
+                    child: ExListView(
+                      prefKey: uiModel,
+                      labelText: "Model:",
+                      items: widget.models,
+                      defaultValue: "",
                     ),
-                    ExTextField(
-                      labelText: "Temperature:",
-                      prefKey: uiModelTemperature,
-                      keyboardType: TextInputType.number,
-                      defaultValue: -1,
-                    ),
-                    ExTextField(
-                      labelText: "Top_P:",
-                      prefKey: uiModelTopP,
-                      keyboardType: TextInputType.number,
-                      defaultValue: -1,
-                    ),
-                  ],
-                ),
+                  ),
+                  const ExTextField(
+                    labelText: "Temperature:",
+                    prefKey: uiModelTemperature,
+                    keyboardType: TextInputType.number,
+                    defaultValue: -1,
+                  ),
+                  const ExTextField(
+                    labelText: "Top_P:",
+                    prefKey: uiModelTopP,
+                    keyboardType: TextInputType.number,
+                    defaultValue: -1,
+                  ),
+                ],
               ),
-              Expanded(
-                child: ExListView(
-                  items: [autoMood, ...moods],
-                  labelText: "Mood:",
-                  prefKey: uiMood,
-                  defaultValue: autoMood,
-                ),
+            ),
+            const Expanded(
+              child: ExListView(
+                items: [autoMood, ...moods],
+                labelText: "Mood:",
+                prefKey: uiMood,
+                defaultValue: autoMood,
               ),
-            ],
-          ),
+            ),
+          ],
         ),
-        SizedBox(height: 30),
-      ],
-    );
-  }
+      ),
+      const SizedBox(height: 30),
+    ],
+  );
 }
