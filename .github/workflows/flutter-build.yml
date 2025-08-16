@@ -1,0 +1,113 @@
+name: Flutter Cross-Platform Build
+
+on:
+  push:
+    branches: [ desktop ]
+  pull_request:
+
+jobs:
+  build:
+    name: Build on ${{ matrix.os }} (${{ matrix.arch }})
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      matrix:
+        include:
+          - os: macOS
+            arch: Intel
+            runner: macos-13
+          - os: macOS
+            arch: ARM
+            runner: macos-14
+          - os: Windows
+            arch: x64
+            runner: windows-latest
+          - os: Linux
+            arch: x64
+            runner: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Get dependencies
+        run: flutter pub get || true
+
+      - name: Install Linux dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            clang cmake git \
+            ninja-build pkg-config \
+            libgtk-3-dev liblzma-dev \
+            libstdc++-12-dev
+
+      - name: Build Flutter desktop app
+        run: |
+          if [[ "$RUNNER_OS" == "macOS" ]]; then
+            flutter build macos --release \
+              --dart-define=CLIENT_ID=${{ secrets.CLIENT_ID }} \
+              --dart-define=CLIENT_SECRET=${{ secrets.CLIENT_SECRET }}
+          elif [[ "$RUNNER_OS" == "Windows" ]]; then
+            flutter build windows --release \
+              --dart-define=CLIENT_ID=${{ secrets.CLIENT_ID }} \
+              --dart-define=CLIENT_SECRET=${{ secrets.CLIENT_SECRET }}
+          else
+            flutter build linux --release \
+              --dart-define=CLIENT_ID=${{ secrets.CLIENT_ID }} \
+              --dart-define=CLIENT_SECRET=${{ secrets.CLIENT_SECRET }}
+          fi
+        shell: bash
+
+      - name: Archive build output (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          mkdir artifacts
+          zip -r artifacts/${{ matrix.os }}-${{ matrix.arch }}.zip build/macos/Build/Products/Release/*
+
+      - name: Archive build output (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          mkdir artifacts
+          zip -r artifacts/${{ matrix.os }}-${{ matrix.arch }}.zip build/linux/x64/release/bundle/*
+
+      - name: Archive build output (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          mkdir artifacts
+          Compress-Archive -Path build\windows\x64\runner\Release\* -DestinationPath artifacts\Windows-x64.zip
+        shell: powershell
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.os }}-${{ matrix.arch }}
+          path: artifacts/*.zip
+
+      - name: Create Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.ref_name }}
+          release_name: Release ${{ github.ref_name }}
+          draft: false
+          prerelease: false
+
+      - name: Upload Release Asset
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: artifacts/${{ matrix.os }}-${{ matrix.arch }}.zip
+          asset_name: ${{ matrix.os }}-${{ matrix.arch }}.zip
+          asset_content_type: application/zip
