@@ -4,7 +4,6 @@ import "dart:io";
 import "dart:math";
 
 import "package:flutter/material.dart";
-import "package:flutter_dotenv/flutter_dotenv.dart";
 import "package:main/blog.dart";
 import "package:main/constants.dart";
 import "package:main/model.dart";
@@ -17,8 +16,6 @@ import "package:url_launcher/url_launcher.dart";
 import "package:window_manager/window_manager.dart";
 
 Future main() async {
-  await dotenv.load(fileName: "assets/.env");
-
   WidgetsFlutterBinding.ensureInitialized();
   await windowManager.ensureInitialized();
 
@@ -60,8 +57,11 @@ class _MainPageState extends State<MainPage> {
   void initState() {
     super.initState();
     unawaited(
-      _startLocalServer().then((_) async {
-        await _init();
+      _startLocalServer().then((_) => _init()).catchError((err) {
+        setState(() {
+          _runningMessage = "❌ $err";
+          _running = false;
+        });
       }),
     );
   }
@@ -99,9 +99,16 @@ class _MainPageState extends State<MainPage> {
   }
 
   Future<void> _init() async {
+    setState(() {
+      _runningMessage = "👾 Contacting Ollama ...";
+    });
     final client = OllamaClient();
     final ModelsResponse modelsResp = await client.listModels();
     _models = modelsResp.models!.map((item) => item.model!).toList();
+
+    setState(() {
+      _runningMessage = "📪 Contacting Tumblr ...";
+    });
 
     _tumblrClient = Client(
       onAuthWebCall: (authUri) async {
@@ -188,7 +195,11 @@ class _MainPageState extends State<MainPage> {
           mainAxisAlignment: MainAxisAlignment.center,
           spacing: 10,
           children: [
-            Expanded(child: Text(_runningMessage, textAlign: TextAlign.center)),
+            Expanded(
+              child: _running
+                  ? Text(_runningMessage, textAlign: TextAlign.center)
+                  : const SizedBox(height: 1),
+            ),
             Opacity(
               opacity: _running ? 0.5 : 1.0,
               child: ElevatedButton(
@@ -197,13 +208,13 @@ class _MainPageState extends State<MainPage> {
                     _generatePost()
                         .then((_) {
                           setState(() {
-                            _runningMessage = "✅Done!";
+                            _runningMessage = "✅ Done!";
                             _running = false;
                           });
                         })
                         .catchError((err) {
                           setState(() {
-                            _runningMessage = "❌$err";
+                            _runningMessage = "❌ $err";
                             _running = false;
                           });
                         }),
@@ -229,7 +240,7 @@ class _MainPageState extends State<MainPage> {
         return const SizedBox(height: 10);
 
       case -1:
-        return const Center(child: Text("📀Loading data from Tumblr..."));
+        return const Center(child: Text("📀 Loading data ..."));
 
       case 0:
         return BlogWidget(targetBlogs: _blogs);
@@ -265,7 +276,7 @@ class _MainPageState extends State<MainPage> {
     final prefs = SharedPreferencesAsync();
 
     final String sourceBlog = (await prefs.getString(uiSourceBlog))!;
-    final String apiKey = dotenv.env["CLIENT_ID"]!;
+    const apiKey = String.fromEnvironment("CLIENT_ID");
     final skipAsks = await prefs.getString(uiSkipAsks) == "true";
     final Iterable<String> skipTags = (await prefs.getString(
       uiSkipTags,
@@ -300,7 +311,7 @@ class _MainPageState extends State<MainPage> {
 
     while (posts.length < maxPosts) {
       setState(() {
-        _runningMessage = "📡Fetched ${posts.length} / $maxPosts posts ...";
+        _runningMessage = "📡 Fetched ${posts.length} / $maxPosts posts ...";
       });
 
       List<Map<String, dynamic>> sourcePosts = [];
@@ -362,7 +373,7 @@ class _MainPageState extends State<MainPage> {
       final client = OllamaClient();
 
       setState(() {
-        _runningMessage = "🧠Calling LLM (trying ${5 - tries}/5) ...";
+        _runningMessage = "🧠 Calling LLM (trying ${5 - tries}/5) ...";
       });
 
       _logController.clear();
@@ -422,7 +433,7 @@ Sei uno scrittore creativo con un tono $mood. Ti verranno forniti dei post tratt
       }
 
       setState(() {
-        _runningMessage = "📝Preparing post ...";
+        _runningMessage = "📝 Preparing post ...";
       });
 
       final List<Map<String, Object>> tumblrPost = match
@@ -469,7 +480,7 @@ Sei uno scrittore creativo con un tono $mood. Ti verranno forniti dei post tratt
 
       if ((await prefs.getString(uiDryRun))! == "false") {
         setState(() {
-          _runningMessage = "📨Posting to Tumblr ...";
+          _runningMessage = "📨 Posting to Tumblr ...";
         });
 
         await _tumblrClient.post(

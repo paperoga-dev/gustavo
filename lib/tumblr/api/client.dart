@@ -3,7 +3,6 @@ import "dart:io";
 import "dart:typed_data";
 
 import "package:flutter/material.dart";
-import "package:flutter_dotenv/flutter_dotenv.dart";
 import "package:http/http.dart" as http;
 import "package:shared_preferences/shared_preferences.dart";
 import "package:uuid/uuid.dart";
@@ -34,8 +33,8 @@ class Client {
         headers: {"Content-Type": "application/x-www-form-urlencoded"},
         body: {
           "grant_type": "refresh_token",
-          "client_id": dotenv.env["CLIENT_ID"],
-          "client_secret": dotenv.env["CLIENT_SECRET"],
+          "client_id": const String.fromEnvironment("CLIENT_ID"),
+          "client_secret": const String.fromEnvironment("CLIENT_SECRET"),
           "refresh_token": _authToken!["refresh_token"],
         },
       );
@@ -63,7 +62,7 @@ class Client {
       _makeUri(
         "/oauth2/authorize",
         queryParameters: {
-          "client_id": dotenv.env["CLIENT_ID"],
+          "client_id": const String.fromEnvironment("CLIENT_ID"),
           "response_type": "code",
           "scope": "write offline_access",
           "state": uuid.v1(),
@@ -77,8 +76,8 @@ class Client {
         body: {
           "grant_type": "authorization_code",
           "code": verifier,
-          "client_id": dotenv.env["CLIENT_ID"],
-          "client_secret": dotenv.env["CLIENT_SECRET"],
+          "client_id": const String.fromEnvironment("CLIENT_ID"),
+          "client_secret": const String.fromEnvironment("CLIENT_SECRET"),
         },
       );
 
@@ -97,12 +96,9 @@ class Client {
     final Uri uri = _makeUri(path, queryParameters: queryParameters);
 
     if (_authToken == null) {
-      return _getAccessToken()
-          .then((_) => get(path, queryParameters: queryParameters))
-          .catchError((err) {
-            debugPrint("GET, ERROR, $err");
-            return <String, dynamic>{};
-          });
+      return _getAccessToken().then(
+        (_) => get(path, queryParameters: queryParameters),
+      );
     }
 
     debugPrint("GET, url = $uri");
@@ -138,12 +134,7 @@ class Client {
     final Uri uri = _makeUri(path);
 
     if (_authToken == null) {
-      return _getAccessToken()
-          .then((_) => post(path, body: body))
-          .catchError((err) {
-            debugPrint("POST, ERROR, $err");
-            return;
-          });
+      return _getAccessToken().then((_) => post(path, body: body));
     }
 
     debugPrint("POST, url = $uri");
