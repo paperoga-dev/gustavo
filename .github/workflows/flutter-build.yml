@@ -1,113 +1,135 @@
-name: Flutter Cross-Platform Build
+name: Flutter Deskop Deployment
 
 on:
   push:
-    branches: [ desktop ]
-  pull_request:
+    branches:
+      - desktop
+    tags:
+      - 'v*.*.*'
 
 jobs:
-  build:
-    name: Build on ${{ matrix.os }} (${{ matrix.arch }})
-    runs-on: ${{ matrix.runner }}
+  linux:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v2
+      - uses: subosito/flutter-action@v1
+        with:
+          channel: 'stable'
+      - name: Install os dependencies
+        run: sudo apt-get install -y clang cmake git ninja-build pkg-config libgtk-3-dev liblzma-dev libstdc++-12-dev
+      - name: Install project dependencies
+        run: flutter pub get || true
+      - name: Enable linux build
+        run: flutter config --enable-linux-desktop
+      - name: Build artifacts
+        run: flutter build linux --release --split-debug-info=debugsym --dart-define=CLIENT_ID=${{ secrets.CLIENT_ID }} --dart-define=CLIENT_SECRET=${{ secrets.CLIENT_SECRET }}
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: Linux64
+          path: build/linux/x64/release/bundle
+      - name: Create package folder
+        if: startsWith(github.ref, 'refs/tags/')
+        run: mkdir package
+      - name: Package Release files
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: thedoctor0/zip-release@master
+        with:
+          type: 'zip'
+          filename: ../../../../../package/TumblrAI-${{github.ref_name}}-Linux64.zip
+          directory: build/linux/x64/release/bundle
+      - name: Release to github
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GH_PAT }}
+        with:
+          tag_name: ${{github.ref_name}}
+          files: package/TumblrAI-${{github.ref_name}}-Linux64.zip
+
+
+  windows:
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v2
+      - uses: subosito/flutter-action@v1
+        with:
+          channel: 'stable'
+      - name: Install project dependencies
+        run: flutter pub get || true
+      - name: Enable windows build
+        run: flutter config --enable-windows-desktop
+      - name: Build artifacts
+        run: flutter build windows --release --split-debug-info=debugsym --dart-define=CLIENT_ID=${{ secrets.CLIENT_ID }} --dart-define=CLIENT_SECRET=${{ secrets.CLIENT_SECRET }}
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: Windows64
+          path: build/windows/x64/runner/Release
+      - name: Create package folder
+        if: startsWith(github.ref, 'refs/tags/')
+        run: mkdir package
+      - name: Package Release files
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: thedoctor0/zip-release@master
+        with:
+          type: 'zip'
+          filename: ../../../../../package/TumblrAI-${{github.ref_name}}-Windows64.zip
+          directory: build/windows/x64/runner/Release
+      - name: Release to github
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GH_PAT }}
+        with:
+          tag_name: ${{github.ref_name}}
+          files: package/TumblrAI-${{github.ref_name}}-Windows64.zip
+
+
+  macos:
+    runs-on: ${{ matrix.os }}
     strategy:
       matrix:
         include:
-          - os: macOS
+          - os: macos-13
             arch: Intel
-            runner: macos-13
-          - os: macOS
+          - os: macos-latest
             arch: ARM
-            runner: macos-14
-          - os: Windows
-            arch: x64
-            runner: windows-latest
-          - os: Linux
-            arch: x64
-            runner: ubuntu-latest
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up Flutter
-        uses: subosito/flutter-action@v2
+      - uses: actions/checkout@v2
+      - uses: subosito/flutter-action@v1
         with:
-          channel: stable
-          cache: true
-
-      - name: Get dependencies
+          channel: 'stable'
+      - name: Install project dependencies
         run: flutter pub get || true
-
-      - name: Install Linux dependencies
-        if: runner.os == 'Linux'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            clang cmake git \
-            ninja-build pkg-config \
-            libgtk-3-dev liblzma-dev \
-            libstdc++-12-dev
-
-      - name: Build Flutter desktop app
-        run: |
-          if [[ "$RUNNER_OS" == "macOS" ]]; then
-            flutter build macos --release \
-              --dart-define=CLIENT_ID=${{ secrets.CLIENT_ID }} \
-              --dart-define=CLIENT_SECRET=${{ secrets.CLIENT_SECRET }}
-          elif [[ "$RUNNER_OS" == "Windows" ]]; then
-            flutter build windows --release \
-              --dart-define=CLIENT_ID=${{ secrets.CLIENT_ID }} \
-              --dart-define=CLIENT_SECRET=${{ secrets.CLIENT_SECRET }}
-          else
-            flutter build linux --release \
-              --dart-define=CLIENT_ID=${{ secrets.CLIENT_ID }} \
-              --dart-define=CLIENT_SECRET=${{ secrets.CLIENT_SECRET }}
-          fi
-        shell: bash
-
-      - name: Archive build output (macOS)
-        if: runner.os == 'macOS'
-        run: |
-          mkdir artifacts
-          zip -r artifacts/${{ matrix.os }}-${{ matrix.arch }}.zip build/macos/Build/Products/Release/*
-
-      - name: Archive build output (Linux)
-        if: runner.os == 'Linux'
-        run: |
-          mkdir artifacts
-          zip -r artifacts/${{ matrix.os }}-${{ matrix.arch }}.zip build/linux/x64/release/bundle/*
-
-      - name: Archive build output (Windows)
-        if: runner.os == 'Windows'
-        run: |
-          mkdir artifacts
-          Compress-Archive -Path build\windows\x64\runner\Release\* -DestinationPath artifacts\Windows-x64.zip
-        shell: powershell
-
-      - name: Upload artifact
+      - name: Enable macos build
+        run: flutter config --enable-macos-desktop
+      - name: Build artifacts
+        run: flutter build macos --release --split-debug-info=debugsym --dart-define=CLIENT_ID=${{ secrets.CLIENT_ID }} --dart-define=CLIENT_SECRET=${{ secrets.CLIENT_SECRET }}
+      - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.os }}-${{ matrix.arch }}
-          path: artifacts/*.zip
-
-      - name: Create Release
+          name: MacOS-${{ matrix.arch }} 
+          path: build/macos/Build/Products/Release/TumblrAI.app
+      - name: Create package folder
         if: startsWith(github.ref, 'refs/tags/')
-        uses: actions/create-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          tag_name: ${{ github.ref_name }}
-          release_name: Release ${{ github.ref_name }}
-          draft: false
-          prerelease: false
-
-      - name: Upload Release Asset
+        run: mkdir package
+      - name: Package Release files
         if: startsWith(github.ref, 'refs/tags/')
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        uses: thedoctor0/zip-release@master
         with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: artifacts/${{ matrix.os }}-${{ matrix.arch }}.zip
-          asset_name: ${{ matrix.os }}-${{ matrix.arch }}.zip
-          asset_content_type: application/zip
+          type: 'zip'
+          filename: ../../../../../package/TumblrAI-${{github.ref_name}}-MacOS-${{ matrix.arch }}.zip
+          directory: build/macos/Build/Products/Release
+          path: TumblrAI.app
+      - name: Release to github
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GH_PAT }}
+        with:
+          tag_name: ${{github.ref_name}}
+          files: package/TumblrAI-${{github.ref_name}}-MacOS-${{ matrix.arch }}.zip
