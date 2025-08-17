@@ -1,7 +1,7 @@
 import "package:flutter/material.dart";
 import "package:main/constants.dart";
 import "package:main/ui/listview.dart";
-import "package:main/ui/textfield.dart";
+import "package:main/ui/slider.dart";
 
 class ModelWidget extends StatefulWidget {
   final List<String> models;
@@ -35,18 +35,11 @@ class _ModelWidgetState extends State<ModelWidget> {
                       defaultValue: "",
                     ),
                   ),
-                  const ExTextField(
+                  const ExSlider(
                     labelText: "Temperature:",
                     prefKey: uiModelTemperature,
-                    keyboardType: TextInputType.number,
-                    defaultValue: -1,
                   ),
-                  const ExTextField(
-                    labelText: "Top_P:",
-                    prefKey: uiModelTopP,
-                    keyboardType: TextInputType.number,
-                    defaultValue: -1,
-                  ),
+                  const ExSlider(labelText: "Top_P:", prefKey: uiModelTopP),
                 ],
               ),
             ),

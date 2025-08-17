@@ -11,6 +11,7 @@ import "package:main/tumblr/api/client.dart";
 import "package:main/ui/checkbox.dart";
 import "package:main/ui/textoutput.dart";
 import "package:ollama_dart/ollama_dart.dart";
+import "package:package_info_plus/package_info_plus.dart";
 import "package:shared_preferences/shared_preferences.dart";
 import "package:url_launcher/url_launcher.dart";
 import "package:window_manager/window_manager.dart";
@@ -22,7 +23,8 @@ Future main() async {
   runApp(const App());
 
   await windowManager.waitUntilReadyToShow();
-  await windowManager.setTitle("Tumblr AI");
+  final PackageInfo info = await PackageInfo.fromPlatform();
+  await windowManager.setTitle("Tumblr AI - v${info.version}");
   await windowManager.show();
   await windowManager.focus();
 }
@@ -389,9 +391,9 @@ class _MainPageState extends State<MainPage> {
       mood = mood.toLowerCase();
       final String model = (await prefs.getString(uiModel))!;
       final int start = DateTime.now().millisecondsSinceEpoch ~/ 1000;
-      final int stTemp = (await prefs.getInt(uiModelTemperature))!;
+      final double stTemp = (await prefs.getDouble(uiModelTemperature))!;
       final double temp = (stTemp < 0 ? Random().nextInt(10) : stTemp) / 10;
-      final int stTopP = (await prefs.getInt(uiModelTopP))!;
+      final double stTopP = (await prefs.getDouble(uiModelTopP))!;
       final double topP = (stTopP < 0 ? Random().nextInt(10) : stTopP) / 10;
       final Stream<GenerateChatCompletionResponse> stream = client
           .generateChatCompletionStream(
