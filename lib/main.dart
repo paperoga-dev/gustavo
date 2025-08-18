@@ -45,43 +45,41 @@ class MainPage extends StatefulWidget {
 }
 
 class _MainPageState extends State<MainPage> {
-  var _selectedIndex = -1;
-  Completer<String>? _authCode;
-  List<String> _blogs = [];
-  List<String> _models = [];
-  late Client _tumblrClient;
-  HttpServer? _server;
-  var _running = true;
+  var _selectedIndex = 0;
+  final Client _tumblrClient;
+  var _running = false;
   var _runningMessage = "";
   final _logController = ExTextOutputController();
 
-  @override
-  void initState() {
-    super.initState();
-    unawaited(
-      _startLocalServer().then((_) => _init()).catchError((err) {
-        setState(() {
-          _runningMessage = "❌ $err";
-          _running = false;
-        });
-      }),
+  _MainPageState()
+    : _tumblrClient = Client(
+        onAuthWebCall: (authUri) async {
+          final (HttpServer server, Completer<String> authCode) =
+              await _startLocalServer();
+
+          if (await canLaunchUrl(authUri)) {
+            await launchUrl(authUri, mode: LaunchMode.externalApplication);
+          } else {
+            throw Exception("Could not launch $authUri");
+          }
+
+          return authCode.future.whenComplete(() {
+            unawaited(server.close());
+          });
+        },
+      );
+
+  static Future<(HttpServer, Completer<String>)> _startLocalServer() async {
+    final HttpServer server = await HttpServer.bind(
+      InternetAddress.loopbackIPv4,
+      3000,
     );
-  }
 
-  @override
-  void dispose() {
-    unawaited(_server?.close(force: true));
-    super.dispose();
-  }
+    final authCode = Completer<String>();
 
-  Future<void> _startLocalServer() async {
-    _server = await HttpServer.bind(InternetAddress.loopbackIPv4, 3000);
-
-    _server!.listen((request) async {
+    server.listen((request) async {
       if (request.uri.queryParameters.containsKey("code")) {
         final String? code = request.uri.queryParameters["code"];
-
-        _authCode?.complete(code);
 
         request.response
           ..statusCode = 200
@@ -89,51 +87,20 @@ class _MainPageState extends State<MainPage> {
           ..write(
             '<html lang="en"><body><h3>Login successful. You can close this window.</h3></body></html>',
           );
-        await request.response.close();
+
+        authCode.complete(code);
       } else {
         request.response
           ..statusCode = 404
-          ..write("Not Found")
-          // ignore: unawaited_futures
-          ..close();
+          ..write("Not Found");
+
+        authCode.completeError(Exception("❌ Auth code failed"));
       }
-    });
-  }
 
-  Future<void> _init() async {
-    setState(() {
-      _runningMessage = "👾 Contacting Ollama ...";
-    });
-    final client = OllamaClient();
-    final ModelsResponse modelsResp = await client.listModels();
-    _models = modelsResp.models!.map((item) => item.model!).toList();
-
-    setState(() {
-      _runningMessage = "📪 Contacting Tumblr ...";
+      await request.response.close();
     });
 
-    _tumblrClient = Client(
-      onAuthWebCall: (authUri) async {
-        _authCode = Completer<String>();
-        if (await canLaunchUrl(authUri)) {
-          await launchUrl(authUri, mode: LaunchMode.externalApplication);
-        } else {
-          throw Exception("Could not launch $authUri");
-        }
-
-        return _authCode!.future;
-      },
-    );
-
-    Map<String, dynamic> user = await _tumblrClient.get("/user/info");
-    setState(() {
-      _running = false;
-      _blogs = user["user"]["blogs"]
-          .map((item) => item["name"])
-          .toList()
-          .cast<String>();
-      _selectedIndex = 0;
-    });
+    return (server, authCode);
   }
 
   @override
@@ -241,14 +208,11 @@ class _MainPageState extends State<MainPage> {
       case null:
         return const SizedBox(height: 10);
 
-      case -1:
-        return const Center(child: Text("📀 Loading data ..."));
-
       case 0:
-        return BlogWidget(targetBlogs: _blogs);
+        return BlogWidget(tumblrClient: _tumblrClient);
 
       case 1:
-        return ModelWidget(models: _models);
+        return const ModelWidget();
 
       case 2:
         return Column(

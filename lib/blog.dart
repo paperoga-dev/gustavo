@@ -1,20 +1,50 @@
+import "dart:async";
+
 import "package:flutter/material.dart";
 
 import "package:main/constants.dart";
+import "package:main/tumblr/api/client.dart";
 import "package:main/ui/checkbox.dart";
 import "package:main/ui/listview.dart";
 import "package:main/ui/textfield.dart";
 
 class BlogWidget extends StatefulWidget {
-  final List<String> targetBlogs;
+  final Client tumblrClient;
 
-  const BlogWidget({super.key, required this.targetBlogs});
+  const BlogWidget({super.key, required this.tumblrClient});
 
   @override
   State<BlogWidget> createState() => _BlogWidgetState();
 }
 
 class _BlogWidgetState extends State<BlogWidget> {
+  final Completer<List<String>> _blogs;
+
+  _BlogWidgetState() : _blogs = Completer<List<String>>();
+
+  @override
+  void initState() {
+    super.initState();
+
+    unawaited(
+      widget.tumblrClient
+          .get("/user/info")
+          .then(
+            (user) {
+              _blogs.complete(
+                user["user"]["blogs"]
+                    .map((item) => item["name"])
+                    .toList()
+                    .cast<String>(),
+              );
+            },
+            onError: (err) {
+              _blogs.completeError(err);
+            },
+          ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) => Column(
     crossAxisAlignment: CrossAxisAlignment.start,
@@ -68,10 +98,11 @@ class _BlogWidgetState extends State<BlogWidget> {
             ),
             Expanded(
               child: ExListView(
-                items: widget.targetBlogs,
+                items: _blogs.future,
                 prefKey: uiTargetBlog,
                 labelText: "Target blog:",
                 defaultValue: "",
+                waitingMessage: "📪 Contacting Tumblr ...",
               ),
             ),
           ],
