@@ -34,6 +34,11 @@ try {
             describe: "Minimum size of the post to keep",
             type: "number"
         })
+        .option("maxSize", {
+            default: 5000,
+            describe: "Maximum size of the post to keep",
+            type: "number"
+        })
         .option("mood", {
             describe: "Post mood",
             type: "string"
@@ -80,7 +85,7 @@ try {
     process.stdout.write(`Using model: ${model}\n\n`);
 
     await doPost(argv.source, argv.target, argv.skipAsks, argv.skipTags, postsCount,
-        model, argv.contextSize, argv.minSize,
+        model, argv.contextSize, argv.minSize, argv.maxSize,
         argv.mood ?? input.moodValues[Math.floor(Math.random() * input.moodValues.length)]!.toLocaleLowerCase(),
         tumblrHandler, argv.dryRun === true);
     process.stdout.write("Done!\n");

@@ -1,9 +1,7 @@
-import * as fs from "node:fs";
-import * as path from "node:path";
 import * as https from "./https.js";
 import * as tumblr from "./tumblr.js";
 
-import { PromptTemplate } from "@langchain/core/prompts";
+import { ChatPromptTemplate } from "@langchain/core/prompts";
 import { ChatOllama } from "@langchain/ollama";
 
 export async function doPost(
@@ -15,6 +13,7 @@ export async function doPost(
     model: string,
     contextSize: number,
     minSize: number,
+    maxSize: number,
     mood: string,
     tumblrHandler: https.Handler,
     dryRun: boolean
@@ -62,7 +61,7 @@ export async function doPost(
             .filter(item => item.length > 0)
             .join("\n\n");
 
-        if (text.length > minSize) {
+        if (text.length > minSize && text.length) {
             posts.set(json.id_string, text);
             links.set(json.id_string, json.post_url);
         }
@@ -72,22 +71,36 @@ export async function doPost(
         throw new Error(`Not enough posts found in the blog: ${source}`);
     }
 
-    const promptTemplate = PromptTemplate.fromTemplate(
-        fs.readFileSync(path.join("prompt", model.split(":").at(0)?.split("/").at(-1) ?? ""), { encoding: "utf-8" })
-    );
+    const promptTemplate = ChatPromptTemplate.fromMessages([
+        [
+            "system",
+`Sei uno scrittore creativo con un tono {mood}. Ti verranno forniti dei post tratti da un blog.
 
-    const prompt = await promptTemplate.format({
-        context: Array.from(posts.values()).map((item, index) => `POST ${index + 1}:\n${item}`).join("\n\n"),
-        mood
+- Scrivi un nuovo post originale, imitando lo stile di scrittura e il modo di ragionare dei post del blog.
+- Assicurati che il contenuto tratti temi coerenti e pertinenti rispetto a quelli presenti nei post del blog.
+- Mantieni la struttura tipica dei post originali, evitando di copiarne frasi o passaggi.
+- Racchiudi il tuo post tra i tag <output> e </output>
+`
+        ],
+        [
+            "user",
+            `Questi sono i post:\n\n{posts}`
+        ],
+    ]);
+    const prompt = await promptTemplate.invoke({
+        mood,
+        posts: Array.from(posts.values()).map((item, index) => `POST ${index + 1}:\n${item}`).join("\n\n")
     });
-    process.stdout.write(`Prompt:\n${prompt}\n\n`);
+    process.stdout.write(`Prompt:\n${prompt.toString()}\n\n`);
 
     let tries = 5;
     while (tries--) {
-        const temperature = Math.random() * 2.0;
+        const temperature = Math.random();
+        const topP = Math.random();
         const llm = new ChatOllama({
             model,
-            temperature
+            temperature,
+            topP
         });
 
         const start = Date.now();
@@ -96,7 +109,7 @@ export async function doPost(
         const llmOutput = response.content as string;
         process.stdout.write(`LLM output:\n${llmOutput}\n\n`);
 
-        const llmPost = llmOutput.match(/<post>(.*?)<\/post>/s);
+        const llmPost = llmOutput.match(/<output>(.*?)<\/output>/s);
 
         if (!llmPost) {
             continue;
@@ -135,7 +148,8 @@ export async function doPost(
                 `umore: ${mood}`,
                 `modello: ${model}`,
                 `durata: ${(elapsed / 1000).toFixed(2)}s`,
-                `temperatura: ${temperature.toFixed(2)}`
+                `temperatura: ${temperature.toFixed(1)}`,
+                `top_p: ${topP.toFixed(1)}`
             ].join(",")
         };
 
